@@ -1,0 +1,17 @@
+# PHP
+/api/vendor/
+# composer.lock IS committed (this is an application — reproducible builds)
+
+# Node
+/web/node_modules/
+/web/dist/
+
+# Env (never commit real secrets; .env.example is the tracked template)
+.env
+api/.env
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,90 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-haircut_tracker}
+      MYSQL_USER: ${MYSQL_USER:-haircut}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-haircut}
+      TZ: ${SHOP_TZ:-America/Denver}   # NOW() in shop-local time, matching PHP
+    ports:
+      - "${DB_HOST_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-haircut_tracker}
+      DB_USER: ${DB_USER:-haircut}
+      DB_PASSWORD: ${DB_PASSWORD:-haircut}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-dev-admin-token}
+      ADMIN_AUTH_DISABLED: ${ADMIN_AUTH_DISABLED:-}
+      APP_DEBUG: ${APP_DEBUG:-1}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-me}
+      SHOP_TZ: ${SHOP_TZ:-America/Denver}
+      TZ: ${SHOP_TZ:-America/Denver}
+      WEBAUTHN_RPID: ${WEBAUTHN_RPID:-localhost}
+      # Mail (dev: MailHog catches everything; no real delivery)
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-bookings@haircut.local}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Haircut Tracker}
+      # Booking config
+      HOLD_TTL_MINUTES: ${HOLD_TTL_MINUTES:-10}
+      OTP_TTL_MINUTES: ${OTP_TTL_MINUTES:-10}
+      # Cloudflare Turnstile (optional; blank = bot check skipped in dev)
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
+      # Only honor X-Forwarded-For when set (e.g. "1") — behind a real proxy in prod.
+      TRUSTED_PROXY: ${TRUSTED_PROXY:-}
+      # Public base URL for links in messages
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:8080}
+      # Sub-path the API is served under (empty in dev; "/api" on the single-domain host)
+      API_BASE_PATH: ${API_BASE_PATH:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - ./api:/app
+      - api_vendor:/app/vendor
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILHOG_UI_PORT:-8025}:8025"   # web UI to read caught mail
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080}
+      VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+
+volumes:
+  db_data:
+  api_vendor:
+  web_node_modules:

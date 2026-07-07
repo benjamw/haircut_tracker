@@ -1,0 +1,31 @@
+# Defensive wrapper for Apache/shared hosting.
+#
+# Best practice is still to point the API docroot at api/public. If the host can
+# only point at api/ itself, the rewrite block below forwards public requests to
+# public/ while keeping source, deps, env files, migrations, and tests private.
+Options -Indexes
+
+<FilesMatch "(^\.|\.(env|lock|md|sql|sh|dist)$|^composer\.(json|lock)$|^phinx\.php$|^phpunit\.xml$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Never allow direct web access to application internals when api/ is used
+    # as the docroot or appears under a broader docroot.
+    RewriteRule ^(?:bin|migrations|src|tests|vendor)(?:/|$) - [F,L,NC]
+
+    # Fallback mode: if api/ is the docroot, forward everything public to the
+    # real Slim front-controller directory. api/public/.htaccess then handles
+    # routing non-file requests to index.php.
+    RewriteRule ^$ public/index.php [L]
+    RewriteCond %{REQUEST_URI} !/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

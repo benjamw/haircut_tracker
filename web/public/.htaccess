@@ -1,0 +1,14 @@
+# SPA fallback for the built React app. Vite copies files from web/public/ into
+# the build output, so this ships with `npm run build`. Serves index.html for
+# client routes like /admin so deep links don't 404 on Apache.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    # Leave the backend alone — the API lives under /api with its own app + .htaccess.
+    RewriteCond %{REQUEST_URI} !^/api(/|$)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+Options -Indexes
